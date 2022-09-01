@@ -130,6 +130,10 @@ func (s *Session) Clone() fosite.Session {
 	return deepcopy.Copy(s).(fosite.Session)
 }
 
+func (s *Session) GetConsentChallenge() string {
+	return s.ConsentChallenge
+}
+
 var keyRewrites = map[string]string{
 	"Extra":                          "extra",
 	"KID":                            "kid",
