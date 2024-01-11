@@ -21,6 +21,7 @@ import (
 	"github.com/ory/fosite/compose"
 	foauth2 "github.com/ory/fosite/handler/oauth2"
 	"github.com/ory/fosite/handler/openid"
+	"github.com/ory/fosite/handler/rfc8628"
 	"github.com/ory/herodot"
 	"github.com/ory/hydra/v2/aead"
 	"github.com/ory/hydra/v2/client"
@@ -87,6 +88,7 @@ type RegistryBase struct {
 	oidcs           jwk.JWTSigner
 	ats             jwk.JWTSigner
 	hmacs           *foauth2.HMACSHAStrategy
+	devHmac         rfc8628.RFC8628CodeStrategy
 	fc              *fositex.Config
 	publicCORS      *cors.Cors
 	kratos          kratos.Client
@@ -409,6 +411,15 @@ func (m *RegistryBase) OAuth2HMACStrategy() *foauth2.HMACSHAStrategy {
 	return m.hmacs
 }
 
+func (m *RegistryBase) RFC8628HMACStrategy() rfc8628.RFC8628CodeStrategy {
+	if m.devHmac != nil {
+		return m.devHmac
+	}
+
+	m.devHmac = compose.NewDeviceStrategy(m.OAuth2Config())
+	return m.devHmac
+}
+
 func (m *RegistryBase) OAuth2Config() *fositex.Config {
 	if m.fc != nil {
 		return m.fc
@@ -435,6 +446,7 @@ func (m *RegistryBase) OAuth2ProviderConfig() fosite.Configurator {
 
 	conf := m.OAuth2Config()
 	hmacAtStrategy := m.OAuth2HMACStrategy()
+	devHmacAtStrategy := m.RFC8628HMACStrategy()
 	oidcSigner := m.OpenIDJWTStrategy()
 	atSigner := m.AccessTokenJWTStrategy()
 	jwtAtStrategy := &foauth2.DefaultJWTStrategy{
@@ -449,6 +461,7 @@ func (m *RegistryBase) OAuth2ProviderConfig() fosite.Configurator {
 			HMACSHAStrategy: hmacAtStrategy,
 			Config:          conf,
 		}),
+		RFC8628CodeStrategy: devHmacAtStrategy,
 		OpenIDConnectTokenStrategy: &openid.DefaultStrategy{
 			Config: conf,
 			Signer: oidcSigner,

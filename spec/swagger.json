@@ -891,6 +891,55 @@
         }
       }
     },
+    "/admin/oauth2/auth/requests/device/verify": {
+      "put": {
+        "description": "Verifies a device grant request",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "schemes": [
+          "http",
+          "https"
+        ],
+        "tags": [
+          "oAuth2"
+        ],
+        "summary": "Verifies a device grant request",
+        "operationId": "verifyUserCodeRequest",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "device_challenge",
+            "in": "query",
+            "required": true
+          },
+          {
+            "name": "Body",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/verifyUserCodeRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "oAuth2RedirectTo",
+            "schema": {
+              "$ref": "#/definitions/oAuth2RedirectTo"
+            }
+          },
+          "default": {
+            "description": "errorOAuth2",
+            "schema": {
+              "$ref": "#/definitions/errorOAuth2"
+            }
+          }
+        }
+      }
+    },
     "/admin/oauth2/auth/requests/login": {
       "get": {
         "description": "When an authorization code, hybrid, or implicit OAuth 2.0 Flow is initiated, Ory asks the login provider\nto authenticate the subject and then tell the Ory OAuth2 Service about it.\n\nPer default, the login provider is Ory itself. You may use a different login provider which needs to be a web-app\nyou write and host, and it must be able to authenticate (\"show the subject a login screen\")\na subject (in OAuth2 the proper name for subject is \"resource owner\").\n\nThe authentication challenge is appended to the login provider URL to which the subject's user-agent (browser) is redirected to. The login\nprovider uses that challenge to fetch information on the OAuth2 request and then accept or reject the requested authentication process.",
@@ -1713,6 +1762,37 @@
         }
       }
     },
+    "/oauth2/device/auth": {
+      "get": {
+        "description": "This endpoint is not documented here because you should never use your own implementation to perform OAuth2 flows.\nOAuth2 is a very popular protocol and a library for your programming language will exists.\n\nTo learn more about this flow please refer to the specification: https://tools.ietf.org/html/rfc8628",
+        "consumes": [
+          "application/x-www-form-urlencoded"
+        ],
+        "schemes": [
+          "http",
+          "https"
+        ],
+        "tags": [
+          "v0alpha2"
+        ],
+        "summary": "The OAuth 2.0 Device Authorize Endpoint",
+        "operationId": "performOAuth2DeviceFlow",
+        "responses": {
+          "200": {
+            "description": "deviceAuthorization",
+            "schema": {
+              "$ref": "#/definitions/deviceAuthorization"
+            }
+          },
+          "default": {
+            "description": "errorOAuth2",
+            "schema": {
+              "$ref": "#/definitions/errorOAuth2"
+            }
+          }
+        }
+      }
+    },
     "/oauth2/register": {
       "post": {
         "description": "This endpoint behaves like the administrative counterpart (`createOAuth2Client`) but is capable of facing the\npublic internet directly and can be used in self-service. It implements the OpenID Connect\nDynamic Client Registration Protocol. This feature needs to be enabled in the configuration. This endpoint\nis disabled by default. It can be enabled by an administrator.\n\nPlease note that using this endpoint you are not able to choose the `client_secret` nor the `client_id` as those\nvalues will be server generated when specifying `token_endpoint_auth_method` as `client_secret_basic` or\n`client_secret_post`.\n\nThe `client_secret` will be returned in the response and you will not be able to retrieve it later on.\nWrite the secret down and keep it somewhere safe.",
@@ -2157,6 +2237,13 @@
         "type": "string"
       }
     },
+    "StringSlicePipeDelimiter": {
+      "type": "array",
+      "title": "StringSlicePipeDelimiter de/encodes the string slice to/from a SQL string.",
+      "items": {
+        "type": "string"
+      }
+    },
     "VerifiableCredentialProof": {
       "type": "object",
       "title": "VerifiableCredentialProof contains the proof of a verifiable credential.",
@@ -2308,6 +2395,77 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "deviceAuthorization": {
+      "description": "# Ory's OAuth 2.0 Device Authorization API",
+      "type": "object",
+      "title": "OAuth2 Device Flow",
+      "properties": {
+        "device_code": {
+          "description": "The device verification code.",
+          "type": "string",
+          "example": "ory_dc_smldfksmdfkl.mslkmlkmlk"
+        },
+        "expires_in": {
+          "description": "The lifetime in seconds of the \"device_code\" and \"user_code\".",
+          "type": "integer",
+          "format": "int64",
+          "example": 16830
+        },
+        "interval": {
+          "description": "The minimum amount of time in seconds that the client\nSHOULD wait between polling requests to the token endpoint.  If no\nvalue is provided, clients MUST use 5 as the default.",
+          "type": "integer",
+          "format": "int64",
+          "example": 5
+        },
+        "user_code": {
+          "description": "The end-user verification code.",
+          "type": "string",
+          "example": "AAAAAA"
+        },
+        "verification_uri": {
+          "description": "The end-user verification URI on the authorization\nserver.  The URI should be short and easy to remember as end users\nwill be asked to manually type it into their user agent.",
+          "type": "string",
+          "example": "https://auth.ory.sh/tv"
+        },
+        "verification_uri_complete": {
+          "description": "A verification URI that includes the \"user_code\" (or\nother information with the same function as the \"user_code\"),\nwhich is designed for non-textual transmission.",
+          "type": "string",
+          "example": "https://auth.ory.sh/tv?user_code=AAAAAA"
+        }
+      }
+    },
+    "deviceGrantRequest": {
+      "type": "object",
+      "title": "Contains information on an ongoing device grant request.",
+      "required": [
+        "challenge",
+        "requested_scope",
+        "requested_access_token_audience",
+        "client"
+      ],
+      "properties": {
+        "challenge": {
+          "description": "ID is the identifier (\"device challenge\") of the device grant request. It is used to\nidentify the session.",
+          "type": "string"
+        },
+        "client": {
+          "$ref": "#/definitions/oAuth2Client"
+        },
+        "handled_at": {
+          "$ref": "#/definitions/nullTime"
+        },
+        "request_url": {
+          "description": "RequestURL is the original Device Grant URL requested.",
+          "type": "string"
+        },
+        "requested_access_token_audience": {
+          "$ref": "#/definitions/StringSlicePipeDelimiter"
+        },
+        "requested_scope": {
+          "$ref": "#/definitions/StringSlicePipeDelimiter"
         }
       }
     },
@@ -3141,6 +3299,10 @@
             "$ref": "#/definitions/credentialSupportedDraft00"
           }
         },
+        "device_authorization_endpoint": {
+          "description": "URL of the authorization server's device authorization endpoint",
+          "type": "string"
+        },
         "end_session_endpoint": {
           "description": "OpenID Connect End-Session Endpoint\n\nURL at the OP to which an RP can perform a redirect to request that the End-User be logged out at the OP.",
           "type": "string"
@@ -3642,6 +3804,15 @@
           "type": "string"
         },
         "format": {
+          "type": "string"
+        }
+      }
+    },
+    "verifyUserCodeRequest": {
+      "description": "Contains information on an device verification",
+      "type": "object",
+      "properties": {
+        "user_code": {
           "type": "string"
         }
       }

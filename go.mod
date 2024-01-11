@@ -12,6 +12,8 @@ replace (
 
 replace github.com/ory/hydra-client-go/v2 => ./internal/httpclient
 
+replace github.com/ory/fosite => github.com/BuzzBumbleBee/fosite v0.0.0-20240104154951-eee739ab777b
+
 require (
 	github.com/ThalesIgnite/crypto11 v1.2.5
 	github.com/bradleyjkemp/cupaloy/v2 v2.8.0
@@ -44,7 +46,7 @@ require (
 	github.com/ory/hydra-client-go/v2 v2.1.1
 	github.com/ory/jsonschema/v3 v3.0.8
 	github.com/ory/kratos-client-go v0.13.1
-	github.com/ory/x v0.0.607
+	github.com/ory/x v0.0.609
 	github.com/pborman/uuid v1.2.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
@@ -197,6 +199,7 @@ require (
 	github.com/openzipkin/zipkin-go v0.4.2 // indirect
 	github.com/ory/dockertest/v3 v3.10.0 // indirect
 	github.com/ory/go-convenience v0.1.0 // indirect
+	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
 	github.com/pkg/profile v1.7.0 // indirect
@@ -225,8 +228,8 @@ require (
 	github.com/xtgo/uuid v0.0.0-20140804021211-a0b114877d4c // indirect
 	go.mongodb.org/mongo-driver v1.12.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.46.1 // indirect
-	go.opentelemetry.io/contrib/propagators/b3 v1.20.0 // indirect
-	go.opentelemetry.io/contrib/propagators/jaeger v1.20.0 // indirect
+	go.opentelemetry.io/contrib/propagators/b3 v1.21.0 // indirect
+	go.opentelemetry.io/contrib/propagators/jaeger v1.21.1 // indirect
 	go.opentelemetry.io/contrib/samplers/jaegerremote v0.15.1 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.21.0 // indirect
@@ -237,6 +240,7 @@ require (
 	golang.org/x/net v0.18.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/time v0.4.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20231106174013-bbf56f31fb17 // indirect

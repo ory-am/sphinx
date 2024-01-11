@@ -54,6 +54,26 @@ func (c *consentMock) HandleHeadlessLogout(ctx context.Context, w http.ResponseW
 	panic("not implemented")
 }
 
+func (c *consentMock) HandleOAuth2DeviceAuthorizationRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, req fosite.DeviceUserRequester) (*flow.AcceptOAuth2ConsentRequest, *flow.Flow, error) {
+	if c.deny {
+		return nil, nil, fosite.ErrRequestForbidden
+	}
+
+	return &flow.AcceptOAuth2ConsentRequest{
+		ConsentRequest: &flow.OAuth2ConsentRequest{
+			Subject: "foo",
+			ACR:     "1",
+		},
+		AuthenticatedAt: sqlxx.NullTime(c.authTime),
+		GrantedScope:    []string{"offline", "openid", "hydra.*"},
+		Session: &flow.AcceptOAuth2ConsentRequestSession{
+			AccessToken: map[string]interface{}{},
+			IDToken:     map[string]interface{}{},
+		},
+		RequestedAt: c.requestTime,
+	}, nil, nil
+}
+
 func (c *consentMock) ObfuscateSubjectIdentifier(ctx context.Context, cl fosite.Client, subject, forcedIdentifier string) (string, error) {
 	if c, ok := cl.(*client.Client); ok && c.SubjectType == "pairwise" {
 		panic("not implemented")

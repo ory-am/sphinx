@@ -117,6 +117,7 @@ Class | Method | HTTP request | Description
 *OAuth2Api* | [**SetOAuth2Client**](docs/OAuth2Api.md#setoauth2client) | **Put** /admin/clients/{id} | Set OAuth 2.0 Client
 *OAuth2Api* | [**SetOAuth2ClientLifespans**](docs/OAuth2Api.md#setoauth2clientlifespans) | **Put** /admin/clients/{id}/lifespans | Set OAuth2 Client Token Lifespans
 *OAuth2Api* | [**TrustOAuth2JwtGrantIssuer**](docs/OAuth2Api.md#trustoauth2jwtgrantissuer) | **Post** /admin/trust/grants/jwt-bearer/issuers | Trust OAuth2 JWT Bearer Grant Type Issuer
+*OAuth2Api* | [**VerifyUserCodeRequest**](docs/OAuth2Api.md#verifyusercoderequest) | **Put** /admin/oauth2/auth/requests/device/verify | Verifies a device grant request
 *OidcApi* | [**CreateOidcDynamicClient**](docs/OidcApi.md#createoidcdynamicclient) | **Post** /oauth2/register | Register OAuth2 Client using OpenID Dynamic Client Registration
 *OidcApi* | [**CreateVerifiableCredential**](docs/OidcApi.md#createverifiablecredential) | **Post** /credentials | Issues a Verifiable Credential
 *OidcApi* | [**DeleteOidcDynamicClient**](docs/OidcApi.md#deleteoidcdynamicclient) | **Delete** /oauth2/register/{id} | Delete OAuth 2.0 Client using the OpenID Dynamic Client Registration Management Protocol
@@ -125,6 +126,7 @@ Class | Method | HTTP request | Description
 *OidcApi* | [**GetOidcUserInfo**](docs/OidcApi.md#getoidcuserinfo) | **Get** /userinfo | OpenID Connect Userinfo
 *OidcApi* | [**RevokeOidcSession**](docs/OidcApi.md#revokeoidcsession) | **Get** /oauth2/sessions/logout | OpenID Connect Front- and Back-channel Enabled Logout
 *OidcApi* | [**SetOidcDynamicClient**](docs/OidcApi.md#setoidcdynamicclient) | **Put** /oauth2/register/{id} | Set OAuth2 Client using OpenID Dynamic Client Registration
+*V0alpha2Api* | [**PerformOAuth2DeviceFlow**](docs/V0alpha2Api.md#performoauth2deviceflow) | **Get** /oauth2/device/auth | The OAuth 2.0 Device Authorize Endpoint
 *WellknownApi* | [**DiscoverJsonWebKeys**](docs/WellknownApi.md#discoverjsonwebkeys) | **Get** /.well-known/jwks.json | Discover Well-Known JSON Web Keys
 
 
@@ -136,6 +138,8 @@ Class | Method | HTTP request | Description
  - [CreateJsonWebKeySet](docs/CreateJsonWebKeySet.md)
  - [CreateVerifiableCredentialRequestBody](docs/CreateVerifiableCredentialRequestBody.md)
  - [CredentialSupportedDraft00](docs/CredentialSupportedDraft00.md)
+ - [DeviceAuthorization](docs/DeviceAuthorization.md)
+ - [DeviceGrantRequest](docs/DeviceGrantRequest.md)
  - [ErrorOAuth2](docs/ErrorOAuth2.md)
  - [GenericError](docs/GenericError.md)
  - [GetVersion200Response](docs/GetVersion200Response.md)
@@ -173,6 +177,7 @@ Class | Method | HTTP request | Description
  - [VerifiableCredentialPrimingResponse](docs/VerifiableCredentialPrimingResponse.md)
  - [VerifiableCredentialProof](docs/VerifiableCredentialProof.md)
  - [VerifiableCredentialResponse](docs/VerifiableCredentialResponse.md)
+ - [VerifyUserCodeRequest](docs/VerifyUserCodeRequest.md)
  - [Version](docs/Version.md)
 
 

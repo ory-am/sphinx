@@ -12,6 +12,7 @@ Name | Type | Description | Notes
 **CodeChallengeMethodsSupported** | Pointer to **[]string** | OAuth 2.0 PKCE Supported Code Challenge Methods  JSON array containing a list of Proof Key for Code Exchange (PKCE) [RFC7636] code challenge methods supported by this authorization server. | [optional] 
 **CredentialsEndpointDraft00** | Pointer to **string** | OpenID Connect Verifiable Credentials Endpoint  Contains the URL of the Verifiable Credentials Endpoint. | [optional] 
 **CredentialsSupportedDraft00** | Pointer to [**[]CredentialSupportedDraft00**](CredentialSupportedDraft00.md) | OpenID Connect Verifiable Credentials Supported  JSON array containing a list of the Verifiable Credentials supported by this authorization server. | [optional] 
+**DeviceAuthorizationEndpoint** | Pointer to **string** | URL of the authorization server&#39;s device authorization endpoint | [optional] 
 **EndSessionEndpoint** | Pointer to **string** | OpenID Connect End-Session Endpoint  URL at the OP to which an RP can perform a redirect to request that the End-User be logged out at the OP. | [optional] 
 **FrontchannelLogoutSessionSupported** | Pointer to **bool** | OpenID Connect Front-Channel Logout Session Required  Boolean value specifying whether the OP can pass iss (issuer) and sid (session ID) query parameters to identify the RP session with the OP when the frontchannel_logout_uri is used. If supported, the sid Claim is also included in ID Tokens issued by the OP. | [optional] 
 **FrontchannelLogoutSupported** | Pointer to **bool** | OpenID Connect Front-Channel Logout Supported  Boolean value specifying whether the OP supports HTTP-based logout, with true indicating support. | [optional] 
@@ -249,6 +250,31 @@ SetCredentialsSupportedDraft00 sets CredentialsSupportedDraft00 field to given v
 `func (o *OidcConfiguration) HasCredentialsSupportedDraft00() bool`
 
 HasCredentialsSupportedDraft00 returns a boolean if a field has been set.
+
+### GetDeviceAuthorizationEndpoint
+
+`func (o *OidcConfiguration) GetDeviceAuthorizationEndpoint() string`
+
+GetDeviceAuthorizationEndpoint returns the DeviceAuthorizationEndpoint field if non-nil, zero value otherwise.
+
+### GetDeviceAuthorizationEndpointOk
+
+`func (o *OidcConfiguration) GetDeviceAuthorizationEndpointOk() (*string, bool)`
+
+GetDeviceAuthorizationEndpointOk returns a tuple with the DeviceAuthorizationEndpoint field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetDeviceAuthorizationEndpoint
+
+`func (o *OidcConfiguration) SetDeviceAuthorizationEndpoint(v string)`
+
+SetDeviceAuthorizationEndpoint sets DeviceAuthorizationEndpoint field to given value.
+
+### HasDeviceAuthorizationEndpoint
+
+`func (o *OidcConfiguration) HasDeviceAuthorizationEndpoint() bool`
+
+HasDeviceAuthorizationEndpoint returns a boolean if a field has been set.
 
 ### GetEndSessionEndpoint
 

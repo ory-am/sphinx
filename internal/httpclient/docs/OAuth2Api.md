@@ -32,6 +32,7 @@ Method | HTTP request | Description
 [**SetOAuth2Client**](OAuth2Api.md#SetOAuth2Client) | **Put** /admin/clients/{id} | Set OAuth 2.0 Client
 [**SetOAuth2ClientLifespans**](OAuth2Api.md#SetOAuth2ClientLifespans) | **Put** /admin/clients/{id}/lifespans | Set OAuth2 Client Token Lifespans
 [**TrustOAuth2JwtGrantIssuer**](OAuth2Api.md#TrustOAuth2JwtGrantIssuer) | **Post** /admin/trust/grants/jwt-bearer/issuers | Trust OAuth2 JWT Bearer Grant Type Issuer
+[**VerifyUserCodeRequest**](OAuth2Api.md#VerifyUserCodeRequest) | **Put** /admin/oauth2/auth/requests/device/verify | Verifies a device grant request
 
 
 
@@ -1928,6 +1929,74 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**TrustedOAuth2JwtGrantIssuer**](TrustedOAuth2JwtGrantIssuer.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/json
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## VerifyUserCodeRequest
+
+> OAuth2RedirectTo VerifyUserCodeRequest(ctx).DeviceChallenge(deviceChallenge).VerifyUserCodeRequest(verifyUserCodeRequest).Execute()
+
+Verifies a device grant request
+
+
+
+### Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    openapiclient "./openapi"
+)
+
+func main() {
+    deviceChallenge := "deviceChallenge_example" // string | 
+    verifyUserCodeRequest := *openapiclient.NewVerifyUserCodeRequest() // VerifyUserCodeRequest |  (optional)
+
+    configuration := openapiclient.NewConfiguration()
+    apiClient := openapiclient.NewAPIClient(configuration)
+    resp, r, err := apiClient.OAuth2Api.VerifyUserCodeRequest(context.Background()).DeviceChallenge(deviceChallenge).VerifyUserCodeRequest(verifyUserCodeRequest).Execute()
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Error when calling `OAuth2Api.VerifyUserCodeRequest``: %v\n", err)
+        fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+    }
+    // response from `VerifyUserCodeRequest`: OAuth2RedirectTo
+    fmt.Fprintf(os.Stdout, "Response from `OAuth2Api.VerifyUserCodeRequest`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiVerifyUserCodeRequestRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **deviceChallenge** | **string** |  | 
+ **verifyUserCodeRequest** | [**VerifyUserCodeRequest**](VerifyUserCodeRequest.md) |  | 
+
+### Return type
+
+[**OAuth2RedirectTo**](OAuth2RedirectTo.md)
 
 ### Authorization
 

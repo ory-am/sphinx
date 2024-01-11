@@ -120,24 +120,24 @@ func (s *DefaultStrategy) authenticationSession(ctx context.Context, _ http.Resp
 	return session, nil
 }
 
-func (s *DefaultStrategy) requestAuthentication(ctx context.Context, w http.ResponseWriter, r *http.Request, ar fosite.AuthorizeRequester) (err error) {
+func (s *DefaultStrategy) requestAuthentication(ctx context.Context, w http.ResponseWriter, r *http.Request, req fosite.Requester) (err error) {
 	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer("").Start(ctx, "DefaultStrategy.requestAuthentication")
 	defer otelx.End(span, &err)
 
-	prompt := stringsx.Splitx(ar.GetRequestForm().Get("prompt"), " ")
+	prompt := stringsx.Splitx(req.GetRequestForm().Get("prompt"), " ")
 	if stringslice.Has(prompt, "login") {
-		return s.forwardAuthenticationRequest(ctx, w, r, ar, "", time.Time{}, nil)
+		return s.forwardAuthenticationRequest(ctx, w, r, req, "", time.Time{}, nil)
 	}
 
 	session, err := s.authenticationSession(ctx, w, r)
 	if errors.Is(err, ErrNoAuthenticationSessionFound) {
-		return s.forwardAuthenticationRequest(ctx, w, r, ar, "", time.Time{}, nil)
+		return s.forwardAuthenticationRequest(ctx, w, r, req, "", time.Time{}, nil)
 	} else if err != nil {
 		return err
 	}
 
 	maxAge := int64(-1)
-	if ma := ar.GetRequestForm().Get("max_age"); len(ma) > 0 {
+	if ma := req.GetRequestForm().Get("max_age"); len(ma) > 0 {
 		var err error
 		maxAge, err = strconv.ParseInt(ma, 10, 64)
 		if err != nil {
@@ -149,12 +149,12 @@ func (s *DefaultStrategy) requestAuthentication(ctx context.Context, w http.Resp
 		if stringslice.Has(prompt, "none") {
 			return errorsx.WithStack(fosite.ErrLoginRequired.WithHint("Request failed because prompt is set to 'none' and authentication time reached 'max_age'."))
 		}
-		return s.forwardAuthenticationRequest(ctx, w, r, ar, "", time.Time{}, nil)
+		return s.forwardAuthenticationRequest(ctx, w, r, req, "", time.Time{}, nil)
 	}
 
-	idTokenHint := ar.GetRequestForm().Get("id_token_hint")
+	idTokenHint := req.GetRequestForm().Get("id_token_hint")
 	if idTokenHint == "" {
-		return s.forwardAuthenticationRequest(ctx, w, r, ar, session.Subject, time.Time(session.AuthenticatedAt), session)
+		return s.forwardAuthenticationRequest(ctx, w, r, req, session.Subject, time.Time(session.AuthenticatedAt), session)
 	}
 
 	hintSub, err := s.getSubjectFromIDTokenHint(r.Context(), idTokenHint)
@@ -162,11 +162,11 @@ func (s *DefaultStrategy) requestAuthentication(ctx context.Context, w http.Resp
 		return err
 	}
 
-	if err := s.matchesValueFromSession(r.Context(), ar.GetClient(), hintSub, session.Subject); errors.Is(err, ErrHintDoesNotMatchAuthentication) {
+	if err := s.matchesValueFromSession(r.Context(), req.GetClient(), hintSub, session.Subject); errors.Is(err, ErrHintDoesNotMatchAuthentication) {
 		return errorsx.WithStack(fosite.ErrLoginRequired.WithHint("Request failed because subject claim from id_token_hint does not match subject from authentication session."))
 	}
 
-	return s.forwardAuthenticationRequest(ctx, w, r, ar, session.Subject, time.Time(session.AuthenticatedAt), session)
+	return s.forwardAuthenticationRequest(ctx, w, r, req, session.Subject, time.Time(session.AuthenticatedAt), session)
 }
 
 func (s *DefaultStrategy) getIDTokenHintClaims(ctx context.Context, idTokenHint string) (jwt.MapClaims, error) {
@@ -193,7 +193,7 @@ func (s *DefaultStrategy) getSubjectFromIDTokenHint(ctx context.Context, idToken
 	return sub, nil
 }
 
-func (s *DefaultStrategy) forwardAuthenticationRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, ar fosite.AuthorizeRequester, subject string, authenticatedAt time.Time, session *flow.LoginSession) error {
+func (s *DefaultStrategy) forwardAuthenticationRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, req fosite.Requester, subject string, authenticatedAt time.Time, session *flow.LoginSession) error {
 	if (subject != "" && authenticatedAt.IsZero()) || (subject == "" && !authenticatedAt.IsZero()) {
 		return errorsx.WithStack(fosite.ErrServerError.WithHint("Consent strategy returned a non-empty subject with an empty auth date, or an empty subject with a non-empty auth date."))
 	}
@@ -204,7 +204,7 @@ func (s *DefaultStrategy) forwardAuthenticationRequest(ctx context.Context, w ht
 	}
 
 	// Let's validate that prompt is actually not "none" if we can't skip authentication
-	prompt := stringsx.Splitx(ar.GetRequestForm().Get("prompt"), " ")
+	prompt := stringsx.Splitx(req.GetRequestForm().Get("prompt"), " ")
 	if stringslice.Has(prompt, "none") && !skip {
 		return errorsx.WithStack(fosite.ErrLoginRequired.WithHint(`Prompt 'none' was requested, but no existing login session was found.`))
 	}
@@ -216,10 +216,13 @@ func (s *DefaultStrategy) forwardAuthenticationRequest(ctx context.Context, w ht
 
 	// Generate the request URL
 	iu := s.c.OAuth2AuthURL(ctx)
+	if _, ok := req.(fosite.DeviceUserRequester); ok {
+		iu = s.c.OAuth2DeviceAuthorisationURL(ctx)
+	}
 	iu.RawQuery = r.URL.RawQuery
 
 	var idTokenHintClaims jwt.MapClaims
-	if idTokenHint := ar.GetRequestForm().Get("id_token_hint"); len(idTokenHint) > 0 {
+	if idTokenHint := req.GetRequestForm().Get("id_token_hint"); len(idTokenHint) > 0 {
 		claims, err := s.getIDTokenHintClaims(r.Context(), idTokenHint)
 		if err != nil {
 			return err
@@ -234,14 +237,14 @@ func (s *DefaultStrategy) forwardAuthenticationRequest(ctx context.Context, w ht
 	}
 
 	// Set the session
-	cl := sanitizeClientFromRequest(ar)
+	cl := sanitizeClientFromRequest(req)
 	loginRequest := &flow.LoginRequest{
 		ID:                challenge,
 		Verifier:          verifier,
 		CSRF:              csrf,
 		Skip:              skip,
-		RequestedScope:    []string(ar.GetRequestedScopes()),
-		RequestedAudience: []string(ar.GetRequestedAudience()),
+		RequestedScope:    []string(req.GetRequestedScopes()),
+		RequestedAudience: []string(req.GetRequestedAudience()),
 		Subject:           subject,
 		Client:            cl,
 		RequestURL:        iu.String(),
@@ -250,10 +253,10 @@ func (s *DefaultStrategy) forwardAuthenticationRequest(ctx context.Context, w ht
 		SessionID:         sqlxx.NullString(sessionID),
 		OpenIDConnectContext: &flow.OAuth2ConsentRequestOpenIDConnectContext{
 			IDTokenHintClaims: idTokenHintClaims,
-			ACRValues:         stringsx.Splitx(ar.GetRequestForm().Get("acr_values"), " "),
-			UILocales:         stringsx.Splitx(ar.GetRequestForm().Get("ui_locales"), " "),
-			Display:           ar.GetRequestForm().Get("display"),
-			LoginHint:         ar.GetRequestForm().Get("login_hint"),
+			ACRValues:         stringsx.Splitx(req.GetRequestForm().Get("acr_values"), " "),
+			UILocales:         stringsx.Splitx(req.GetRequestForm().Get("ui_locales"), " "),
+			Display:           req.GetRequestForm().Get("display"),
+			LoginHint:         req.GetRequestForm().Get("login_hint"),
 		},
 	}
 	f, err := s.r.ConsentManager().CreateLoginRequest(
@@ -336,7 +339,7 @@ func (s *DefaultStrategy) verifyAuthentication(
 	ctx context.Context,
 	w http.ResponseWriter,
 	r *http.Request,
-	req fosite.AuthorizeRequester,
+	req fosite.Requester,
 	verifier string,
 ) (_ *flow.Flow, err error) {
 	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer("").Start(ctx, "DefaultStrategy.verifyAuthentication")
@@ -394,33 +397,64 @@ func (s *DefaultStrategy) verifyAuthentication(
 
 	sessionID := session.LoginRequest.SessionID.String()
 
-	if err := s.r.OpenIDConnectRequestValidator().ValidatePrompt(ctx, &fosite.AuthorizeRequest{
-		ResponseTypes: req.GetResponseTypes(),
-		RedirectURI:   req.GetRedirectURI(),
-		State:         req.GetState(),
-		// HandledResponseTypes, this can be safely ignored because it's not being used by validation
-		Request: fosite.Request{
-			ID:                req.GetID(),
-			RequestedAt:       req.GetRequestedAt(),
-			Client:            req.GetClient(),
-			RequestedAudience: req.GetRequestedAudience(),
-			GrantedAudience:   req.GetGrantedAudience(),
-			RequestedScope:    req.GetRequestedScopes(),
-			GrantedScope:      req.GetGrantedScopes(),
-			Form:              req.GetRequestForm(),
-			Session: &openid.DefaultSession{
-				Claims: &jwt.IDTokenClaims{
-					Subject:     subjectIdentifier,
-					IssuedAt:    time.Now().UTC(),                // doesn't matter
-					ExpiresAt:   time.Now().Add(time.Hour).UTC(), // doesn't matter
-					AuthTime:    time.Time(session.AuthenticatedAt),
-					RequestedAt: session.RequestedAt,
+	var cleanReq fosite.Requester
+	if ar, ok := req.(fosite.AuthorizeRequester); ok {
+		cleanReq = &fosite.AuthorizeRequest{
+			ResponseTypes: ar.GetResponseTypes(),
+			RedirectURI:   ar.GetRedirectURI(),
+			State:         ar.GetState(),
+			// HandledResponseTypes, this can be safely ignored because it's not being used by validation
+			Request: fosite.Request{
+				ID:                req.GetID(),
+				RequestedAt:       req.GetRequestedAt(),
+				Client:            req.GetClient(),
+				RequestedAudience: req.GetRequestedAudience(),
+				GrantedAudience:   req.GetGrantedAudience(),
+				RequestedScope:    req.GetRequestedScopes(),
+				GrantedScope:      req.GetGrantedScopes(),
+				Form:              req.GetRequestForm(),
+				Session: &openid.DefaultSession{
+					Claims: &jwt.IDTokenClaims{
+						Subject:     subjectIdentifier,
+						IssuedAt:    time.Now().UTC(),                // doesn't matter
+						ExpiresAt:   time.Now().Add(time.Hour).UTC(), // doesn't matter
+						AuthTime:    time.Time(session.AuthenticatedAt),
+						RequestedAt: session.RequestedAt,
+					},
+					Headers: &jwt.Headers{},
+					Subject: session.Subject,
 				},
-				Headers: &jwt.Headers{},
-				Subject: session.Subject,
 			},
-		},
-	}); errors.Is(err, fosite.ErrLoginRequired) {
+		}
+	} else if _, ok := req.(fosite.DeviceUserRequester); ok {
+		cleanReq = &fosite.DeviceUserRequest{
+			Request: fosite.Request{
+				ID:                req.GetID(),
+				RequestedAt:       req.GetRequestedAt(),
+				Client:            req.GetClient(),
+				RequestedAudience: req.GetRequestedAudience(),
+				GrantedAudience:   req.GetGrantedAudience(),
+				RequestedScope:    req.GetRequestedScopes(),
+				GrantedScope:      req.GetGrantedScopes(),
+				Form:              req.GetRequestForm(),
+				Session: &openid.DefaultSession{
+					Claims: &jwt.IDTokenClaims{
+						Subject:     subjectIdentifier,
+						IssuedAt:    time.Now().UTC(),                // doesn't matter
+						ExpiresAt:   time.Now().Add(time.Hour).UTC(), // doesn't matter
+						AuthTime:    time.Time(session.AuthenticatedAt),
+						RequestedAt: session.RequestedAt,
+					},
+					Headers: &jwt.Headers{},
+					Subject: session.Subject,
+				},
+			},
+		}
+	} else {
+		return nil, errorsx.WithStack(fosite.ErrServerError.WithHint("Could not determine the Requester type"))
+	}
+
+	if err := s.r.OpenIDConnectRequestValidator().ValidatePrompt(ctx, cleanReq); errors.Is(err, fosite.ErrLoginRequired) {
 		// This indicates that something went wrong with checking the subject id - let's destroy the session to be safe
 		if err := s.revokeAuthenticationSession(ctx, w, r); err != nil {
 			return nil, err
@@ -506,15 +540,15 @@ func (s *DefaultStrategy) requestConsent(
 	ctx context.Context,
 	w http.ResponseWriter,
 	r *http.Request,
-	ar fosite.AuthorizeRequester,
+	req fosite.Requester,
 	f *flow.Flow,
 ) (err error) {
 	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer("").Start(ctx, "DefaultStrategy.requestConsent")
 	defer otelx.End(span, &err)
 
-	prompt := stringsx.Splitx(ar.GetRequestForm().Get("prompt"), " ")
+	prompt := stringsx.Splitx(req.GetRequestForm().Get("prompt"), " ")
 	if stringslice.Has(prompt, "consent") {
-		return s.forwardConsentRequest(ctx, w, r, ar, f, nil)
+		return s.forwardConsentRequest(ctx, w, r, req, f, nil)
 	}
 
 	// https://tools.ietf.org/html/rfc6749
@@ -531,14 +565,16 @@ func (s *DefaultStrategy) requestConsent(
 	// authorization servers as identity proof.  Some operating systems may
 	// offer alternative platform-specific identity features that MAY be
 	// accepted, as appropriate.
-	if ar.GetClient().IsPublic() {
+	if req.GetClient().IsPublic() {
 		// The OpenID Connect Test Tool fails if this returns `consent_required` when `prompt=none` is used.
 		// According to the quote above, it should be ok to allow https to skip consent.
 		//
 		// This is tracked as issue: https://github.com/ory/hydra/issues/866
 		// This is also tracked as upstream issue: https://github.com/openid-certification/oidctest/issues/97
-		if !(ar.GetRedirectURI().Scheme == "https" || (fosite.IsLocalhost(ar.GetRedirectURI()) && ar.GetRedirectURI().Scheme == "http")) {
-			return s.forwardConsentRequest(ctx, w, r, ar, f, nil)
+		if ar, ok := req.(fosite.AuthorizeRequester); ok {
+			if !(ar.GetRedirectURI().Scheme == "https" || (fosite.IsLocalhost(ar.GetRedirectURI()) && ar.GetRedirectURI().Scheme == "http")) {
+				return s.forwardConsentRequest(ctx, w, r, ar, f, nil)
+			}
 		}
 	}
 
@@ -549,25 +585,25 @@ func (s *DefaultStrategy) requestConsent(
 	// 	 return s.forwardConsentRequest(w, r, ar, authenticationSession, nil)
 	// }
 
-	consentSessions, err := s.r.ConsentManager().FindGrantedAndRememberedConsentRequests(ctx, ar.GetClient().GetID(), f.Subject)
+	consentSessions, err := s.r.ConsentManager().FindGrantedAndRememberedConsentRequests(ctx, req.GetClient().GetID(), f.Subject)
 	if errors.Is(err, ErrNoPreviousConsentFound) {
-		return s.forwardConsentRequest(ctx, w, r, ar, f, nil)
+		return s.forwardConsentRequest(ctx, w, r, req, f, nil)
 	} else if err != nil {
 		return err
 	}
 
-	if found := matchScopes(s.r.Config().GetScopeStrategy(ctx), consentSessions, ar.GetRequestedScopes()); found != nil {
-		return s.forwardConsentRequest(ctx, w, r, ar, f, found)
+	if found := matchScopes(s.r.Config().GetScopeStrategy(ctx), consentSessions, req.GetRequestedScopes()); found != nil {
+		return s.forwardConsentRequest(ctx, w, r, req, f, found)
 	}
 
-	return s.forwardConsentRequest(ctx, w, r, ar, f, nil)
+	return s.forwardConsentRequest(ctx, w, r, req, f, nil)
 }
 
 func (s *DefaultStrategy) forwardConsentRequest(
 	ctx context.Context,
 	w http.ResponseWriter,
 	r *http.Request,
-	ar fosite.AuthorizeRequester,
+	req fosite.Requester,
 	f *flow.Flow,
 	previousConsent *flow.AcceptOAuth2ConsentRequest,
 ) error {
@@ -577,7 +613,7 @@ func (s *DefaultStrategy) forwardConsentRequest(
 		skip = true
 	}
 
-	prompt := stringsx.Splitx(ar.GetRequestForm().Get("prompt"), " ")
+	prompt := stringsx.Splitx(req.GetRequestForm().Get("prompt"), " ")
 	if stringslice.Has(prompt, "none") && !skip {
 		return errorsx.WithStack(fosite.ErrConsentRequired.WithHint(`Prompt 'none' was requested, but no previous consent was found.`))
 	}
@@ -587,7 +623,7 @@ func (s *DefaultStrategy) forwardConsentRequest(
 	challenge := strings.Replace(uuid.New(), "-", "", -1)
 	csrf := strings.Replace(uuid.New(), "-", "", -1)
 
-	cl := sanitizeClientFromRequest(ar)
+	cl := sanitizeClientFromRequest(req)
 
 	consentRequest := &flow.OAuth2ConsentRequest{
 		ID:                     challenge,
@@ -596,8 +632,8 @@ func (s *DefaultStrategy) forwardConsentRequest(
 		Verifier:               verifier,
 		CSRF:                   csrf,
 		Skip:                   skip,
-		RequestedScope:         []string(ar.GetRequestedScopes()),
-		RequestedAudience:      []string(ar.GetRequestedAudience()),
+		RequestedScope:         []string(req.GetRequestedScopes()),
+		RequestedAudience:      []string(req.GetRequestedAudience()),
 		Subject:                as.Subject,
 		Client:                 cl,
 		RequestURL:             as.LoginRequest.RequestURL,
@@ -1177,4 +1213,137 @@ func (s *DefaultStrategy) loginSessionFromCookie(r *http.Request) *flow.LoginSes
 	ls, _ := flowctx.FromCookie[flow.LoginSession](r.Context(), r, s.r.FlowCipher(), flowctx.LoginSessionCookie(flowctx.SuffixFromStatic(clientID)))
 
 	return ls
+}
+
+func (s *DefaultStrategy) requestDevice(ctx context.Context, w http.ResponseWriter, r *http.Request, req fosite.Requester) error {
+	return s.forwardDeviceRequest(ctx, w, r, req)
+}
+
+func (s *DefaultStrategy) forwardDeviceRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, req fosite.Requester) error {
+	// Set up csrf/challenge/verifier values
+	verifier := strings.Replace(uuid.New(), "-", "", -1)
+	challenge := strings.Replace(uuid.New(), "-", "", -1)
+	csrf := strings.Replace(uuid.New(), "-", "", -1)
+
+	// Generate the request URL
+	iu := s.c.OAuth2DeviceAuthorisationURL(ctx)
+	iu.RawQuery = r.URL.RawQuery
+
+	if err := s.r.ConsentManager().CreateDeviceGrantRequest(
+		r.Context(),
+		&flow.DeviceGrantRequest{
+			ID:         challenge,
+			Verifier:   verifier,
+			CSRF:       csrf,
+			RequestURL: iu.String(),
+		},
+	); err != nil {
+		return errorsx.WithStack(err)
+	}
+
+	store, err := s.r.CookieStore(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := createCsrfSession(w, r, s.r.Config(), store, s.r.Config().CookieNameDeviceVerifyCSRF(ctx), csrf, s.c.ConsentRequestMaxAge(ctx)); err != nil {
+		return errorsx.WithStack(err)
+	}
+
+	query := url.Values{"device_challenge": {challenge}}
+	if r.URL.Query().Has("user_code") {
+		query.Add("user_code", r.URL.Query().Get("user_code"))
+	}
+
+	http.Redirect(w, r, urlx.SetQuery(s.c.DeviceUrl(ctx), query).String(), http.StatusFound)
+
+	// generate the verifier
+	return errorsx.WithStack(ErrAbortOAuth2Request)
+}
+
+func (s *DefaultStrategy) verifyDevice(ctx context.Context, w http.ResponseWriter, r *http.Request, req fosite.DeviceUserRequester, verifier string) (*flow.DeviceGrantRequest, error) {
+	session, err := s.r.ConsentManager().GetDeviceGrantRequestByVerifier(ctx, verifier)
+	if errors.Is(err, sqlcon.ErrNoRows) {
+		return nil, errorsx.WithStack(fosite.ErrAccessDenied.WithHint("The device verifier has already been used, has not been granted, or is invalid."))
+	} else if err != nil {
+		return nil, err
+	}
+
+	if session.Client.GetID() != req.GetClient().GetID() {
+		return nil, errorsx.WithStack(fosite.ErrInvalidGrant.WithHint("The OAuth 2.0 Client ID from this request does not match the one from the authorize request."))
+	}
+
+	if time.Time(session.AcceptedAt).Add(s.c.ConsentRequestMaxAge(ctx)).Before(time.Now()) {
+		return nil, errorsx.WithStack(fosite.ErrRequestUnauthorized.WithHint("The device request has expired. Please try again."))
+	}
+
+	store, err := s.r.CookieStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = validateCsrfSession(r, s.r.Config(), store, s.r.Config().CookieNameDeviceVerifyCSRF(ctx), session.CSRF); err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+func (s *DefaultStrategy) invalidateDeviceRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, req fosite.DeviceUserRequester, verifier string) (*flow.DeviceGrantRequest, error) {
+	session, err := s.r.ConsentManager().VerifyAndInvalidateDeviceGrantRequest(ctx, verifier)
+	if errors.Is(err, sqlcon.ErrNoRows) {
+		return nil, errorsx.WithStack(fosite.ErrAccessDenied.WithHint("The device verifier has already been used, has not been granted, or is invalid."))
+	} else if err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+func (s *DefaultStrategy) HandleOAuth2DeviceAuthorizationRequest(
+	ctx context.Context,
+	w http.ResponseWriter,
+	r *http.Request,
+	req fosite.DeviceUserRequester,
+) (*flow.AcceptOAuth2ConsentRequest, *flow.Flow, error) {
+	loginVerifier := strings.TrimSpace(req.GetRequestForm().Get("login_verifier"))
+	consentVerifier := strings.TrimSpace(req.GetRequestForm().Get("consent_verifier"))
+	deviceVerifier := strings.TrimSpace(req.GetRequestForm().Get("device_verifier"))
+
+	if deviceVerifier == "" && loginVerifier == "" && consentVerifier == "" {
+		// ok, we need to process this request and redirect to device auth endpoint
+		return nil, nil, s.requestDevice(ctx, w, r, req)
+	} else if loginVerifier == "" && consentVerifier == "" {
+		deviceSession, err := s.verifyDevice(ctx, w, r, req, deviceVerifier)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Set scope & audience requested by remote device;
+		req.SetRequestedScopes(fosite.Arguments(deviceSession.RequestedScope))
+		req.SetRequestedAudience(fosite.Arguments(deviceSession.RequestedAudience))
+
+		return nil, nil, s.requestAuthentication(ctx, w, r, req)
+	} else if consentVerifier == "" {
+		f, err := s.verifyAuthentication(ctx, w, r, req, loginVerifier)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// ok, we need to process this request and redirect to auth endpoint
+		return nil, f, s.requestConsent(ctx, w, r, req, f)
+	}
+
+	deviceSession, err := s.invalidateDeviceRequest(ctx, w, r, req, deviceVerifier)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.SetDeviceCodeSignature(deviceSession.DeviceCodeSignature.String())
+
+	consentSession, f, err := s.verifyConsent(ctx, w, r, consentVerifier)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return consentSession, f, nil
 }

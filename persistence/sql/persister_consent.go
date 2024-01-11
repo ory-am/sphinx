@@ -217,6 +217,59 @@ func (p *Persister) GetConsentRequest(ctx context.Context, challenge string) (*f
 	return f.GetConsentRequest(), nil
 }
 
+func (p *Persister) CreateDeviceGrantRequest(ctx context.Context, req *flow.DeviceGrantRequest) error {
+	return errorsx.WithStack(p.CreateWithNetwork(ctx, req))
+}
+
+func (p *Persister) GetDeviceGrantRequestByVerifier(ctx context.Context, verifier string) (*flow.DeviceGrantRequest, error) {
+	ctx, span := p.r.Tracer(ctx).Tracer().Start(ctx, "persistence.sql.GetDeviceGrantRequestByVerifier")
+	defer span.End()
+
+	var dgr flow.DeviceGrantRequest
+	return &dgr, sqlcon.HandleError(p.QueryWithNetwork(ctx).Where("verifier = ?", verifier).First(&dgr))
+}
+
+func (p *Persister) AcceptDeviceGrantRequest(ctx context.Context, challenge string, device_code_signature string, client_id string, requested_scopes fosite.Arguments, requested_aud fosite.Arguments) (*flow.DeviceGrantRequest, error) {
+	var dgr flow.DeviceGrantRequest
+	if err := p.transaction(ctx, func(ctx context.Context, c *pop.Connection) error {
+		if err := p.QueryWithNetwork(ctx).Where("challenge = ?", challenge).First(&dgr); err != nil {
+			return sqlcon.HandleError(err)
+		}
+
+		dgr.Accepted = true
+		dgr.AcceptedAt = sqlxx.NullTime(time.Now())
+		dgr.DeviceCodeSignature = sqlxx.NullString(device_code_signature)
+		dgr.ClientID = sqlxx.NullString(client_id)
+		dgr.RequestedScope = sqlxx.StringSlicePipeDelimiter(requested_scopes)
+		dgr.RequestedAudience = sqlxx.StringSlicePipeDelimiter(requested_aud)
+
+		count, err := p.UpdateWithNetwork(ctx, &dgr)
+		if count != 1 {
+			return errorsx.WithStack(x.ErrNotFound)
+		}
+		return err
+	}); err != nil {
+		return nil, sqlcon.HandleError(err)
+	}
+
+	return p.GetDeviceGrantRequestByVerifier(ctx, dgr.Verifier)
+}
+
+func (p *Persister) VerifyAndInvalidateDeviceGrantRequest(ctx context.Context, verifier string) (*flow.DeviceGrantRequest, error) {
+	var dgr flow.DeviceGrantRequest
+	if err := p.transaction(ctx, func(ctx context.Context, c *pop.Connection) error {
+		if err := p.QueryWithNetwork(ctx).Where("verifier = ?", verifier).First(&dgr); err != nil {
+			return sqlcon.HandleError(err)
+		}
+
+		return sqlcon.HandleError(p.QueryWithNetwork(ctx).Where("verifier = ?", verifier).Delete(&dgr))
+	}); err != nil {
+		return nil, err
+	}
+
+	return &dgr, nil
+}
+
 func (p *Persister) CreateLoginRequest(ctx context.Context, req *flow.LoginRequest) (*flow.Flow, error) {
 	ctx, span := p.r.Tracer(ctx).Tracer().Start(ctx, "persistence.sql.CreateLoginRequest")
 	defer span.End()

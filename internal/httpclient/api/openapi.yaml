@@ -786,6 +786,40 @@ paths:
       summary: Reject OAuth 2.0 Consent Request
       tags:
       - oAuth2
+  /admin/oauth2/auth/requests/device/verify:
+    put:
+      description: Verifies a device grant request
+      operationId: verifyUserCodeRequest
+      parameters:
+      - explode: true
+        in: query
+        name: device_challenge
+        required: true
+        schema:
+          type: string
+        style: form
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/verifyUserCodeRequest'
+        x-originalParamName: Body
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/oAuth2RedirectTo'
+          description: oAuth2RedirectTo
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorOAuth2'
+          description: errorOAuth2
+      summary: Verifies a device grant request
+      tags:
+      - oAuth2
   /admin/oauth2/auth/requests/login:
     get:
       description: "When an authorization code, hybrid, or implicit OAuth 2.0 Flow\
@@ -1475,6 +1509,29 @@ paths:
       summary: OAuth 2.0 Authorize Endpoint
       tags:
       - oAuth2
+  /oauth2/device/auth:
+    get:
+      description: "This endpoint is not documented here because you should never\
+        \ use your own implementation to perform OAuth2 flows.\nOAuth2 is a very popular\
+        \ protocol and a library for your programming language will exists.\n\nTo\
+        \ learn more about this flow please refer to the specification: https://tools.ietf.org/html/rfc8628"
+      operationId: performOAuth2DeviceFlow
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/deviceAuthorization'
+          description: deviceAuthorization
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorOAuth2'
+          description: errorOAuth2
+      summary: The OAuth 2.0 Device Authorize Endpoint
+      tags:
+      - v0alpha2
   /oauth2/register:
     post:
       description: |-
@@ -1877,6 +1934,11 @@ components:
       title: "StringSliceJSONFormat represents []string{} which is encoded to/from\
         \ JSON for SQL storage."
       type: array
+    StringSlicePipeDelimiter:
+      items:
+        type: string
+      title: StringSlicePipeDelimiter de/encodes the string slice to/from a SQL string.
+      type: array
     Time:
       format: date-time
       type: string
@@ -2085,6 +2147,86 @@ components:
             type: string
           type: array
       title: Verifiable Credentials Metadata (Draft 00)
+      type: object
+    deviceAuthorization:
+      description: '# Ory''s OAuth 2.0 Device Authorization API'
+      example:
+        user_code: AAAAAA
+        device_code: ory_dc_smldfksmdfkl.mslkmlkmlk
+        interval: 5
+        verification_uri_complete: https://auth.ory.sh/tv?user_code=AAAAAA
+        verification_uri: https://auth.ory.sh/tv
+        expires_in: 16830
+      properties:
+        device_code:
+          description: The device verification code.
+          example: ory_dc_smldfksmdfkl.mslkmlkmlk
+          type: string
+        expires_in:
+          description: The lifetime in seconds of the "device_code" and "user_code".
+          example: 16830
+          format: int64
+          type: integer
+        interval:
+          description: "The minimum amount of time in seconds that the client\nSHOULD\
+            \ wait between polling requests to the token endpoint.  If no\nvalue is\
+            \ provided, clients MUST use 5 as the default."
+          example: 5
+          format: int64
+          type: integer
+        user_code:
+          description: The end-user verification code.
+          example: AAAAAA
+          type: string
+        verification_uri:
+          description: |-
+            The end-user verification URI on the authorization
+            server.  The URI should be short and easy to remember as end users
+            will be asked to manually type it into their user agent.
+          example: https://auth.ory.sh/tv
+          type: string
+        verification_uri_complete:
+          description: "A verification URI that includes the \"user_code\" (or\nother\
+            \ information with the same function as the \"user_code\"),\nwhich is\
+            \ designed for non-textual transmission."
+          example: https://auth.ory.sh/tv?user_code=AAAAAA
+          type: string
+      title: OAuth2 Device Flow
+      type: object
+    deviceGrantRequest:
+      properties:
+        challenge:
+          description: |-
+            ID is the identifier ("device challenge") of the device grant request. It is used to
+            identify the session.
+          type: string
+        client:
+          $ref: '#/components/schemas/oAuth2Client'
+        handled_at:
+          format: date-time
+          title: NullTime implements sql.NullTime functionality.
+          type: string
+        request_url:
+          description: RequestURL is the original Device Grant URL requested.
+          type: string
+        requested_access_token_audience:
+          items:
+            type: string
+          title: StringSlicePipeDelimiter de/encodes the string slice to/from a SQL
+            string.
+          type: array
+        requested_scope:
+          items:
+            type: string
+          title: StringSlicePipeDelimiter de/encodes the string slice to/from a SQL
+            string.
+          type: array
+      required:
+      - challenge
+      - client
+      - requested_access_token_audience
+      - requested_scope
+      title: Contains information on an ongoing device grant request.
       type: object
     errorOAuth2:
       description: Error
@@ -3626,6 +3768,7 @@ components:
         - userinfo_signed_response_alg
         - userinfo_signed_response_alg
         authorization_endpoint: https://playground.ory.sh/ory-hydra/public/oauth2/auth
+        device_authorization_endpoint: device_authorization_endpoint
         claims_supported:
         - claims_supported
         - claims_supported
@@ -3742,6 +3885,9 @@ components:
           items:
             $ref: '#/components/schemas/credentialSupportedDraft00'
           type: array
+        device_authorization_endpoint:
+          description: URL of the authorization server's device authorization endpoint
+          type: string
         end_session_endpoint:
           description: |-
             OpenID Connect End-Session Endpoint
@@ -4347,6 +4493,12 @@ components:
         format:
           type: string
       title: VerifiableCredentialResponse contains the verifiable credential.
+      type: object
+    verifyUserCodeRequest:
+      description: Contains information on an device verification
+      properties:
+        user_code:
+          type: string
       type: object
     version:
       properties:
